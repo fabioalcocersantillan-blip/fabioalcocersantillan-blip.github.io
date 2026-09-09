@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curva — calendario de repasos espaciados</title>
+<meta name="description" content="Curva es una aplicación de escritorio que calcula calendarios de repaso espaciado y los sincroniza con Google Calendar.">
+<style>
+  :root{--ground:#E7EBF7;--paper:#FBFCFF;--ink:#141A31;--muted:#6A7295;--line:#CFD6EC;--decay:#C8377A;--review:#0E8079}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 22px 80px}
+  .eyebrow{font-family:Consolas,monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--decay);margin:0 0 10px}
+  h1{font-size:clamp(30px,6vw,46px);line-height:1.05;letter-spacing:-.03em;margin:0 0 14px;font-weight:800}
+  h2{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:34px 0 8px}
+  p{margin:0 0 14px}
+  .lede{font-size:18px;color:var(--muted);max-width:56ch}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:22px;margin:26px 0}
+  ul{padding-left:20px;margin:0 0 14px}
+  li{margin-bottom:7px}
+  code{background:#EEF1FA;padding:2px 6px;border-radius:2px;font-family:Consolas,monospace;font-size:14px}
+  a{color:var(--decay)}
+  footer{margin-top:44px;border-top:1px solid var(--line);padding-top:18px;
+    font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Repetición espaciada · horizonte vitalicio</p>
+  <h1>Curva</h1>
+  <p class="lede">Una aplicación de escritorio que calcula cuándo repasar lo que estudias, para que no se te olvide nunca.</p>
+
+  <h2>Qué hace</h2>
+  <p>Le das la fecha del primer repaso de un tema y Curva calcula todas las fechas siguientes, con intervalos que se expanden progresivamente hasta convertirse en mantenimiento de por vida. Alrededor de 33 repasos cubren desde hoy hasta los 85 años.</p>
+  <p>Los intervalos se basan en la investigación sobre la curva del olvido de Ebbinghaus, la recuperación expandida de Landauer y Bjork, y el metaanálisis de espaciado óptimo de Cepeda y colaboradores.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">Funciones</h2>
+    <ul>
+      <li>Calendario completo de repasos a partir de una sola fecha.</li>
+      <li>Gráfico de retención estimada a lo largo de la vida.</li>
+      <li>Marcado de repasos completados.</li>
+      <li>Notificaciones de escritorio el día que toca cada repaso.</li>
+      <li>Exportación a archivo <code>.ics</code>.</li>
+      <li>Sincronización opcional con Google Calendar.</li>
+    </ul>
+  </div>
+
+  <h2>Cómo funciona</h2>
+  <p>Curva se ejecuta enteramente en la computadora del usuario. Los datos se guardan en un archivo local llamado <code>repasos.json</code>, en la misma carpeta que el programa. No hay servidor propio, no hay cuentas de usuario y no se envía información a terceros.</p>
+
+  <h2>Google Calendar</h2>
+  <p>Si el usuario lo activa, Curva puede crear los eventos de repaso en su Google Calendar. Para ello solicita autorización mediante OAuth 2.0 y usa el permiso <code>https://www.googleapis.com/auth/calendar</code>, únicamente para crear, actualizar y eliminar eventos en un calendario propio llamado «Repasos (Curva)».</p>
+  <p>Esta función es opcional. El resto de la aplicación funciona sin ella.</p>
+
+  <h2>Privacidad</h2>
+  <p>Consulta la <a href="privacidad.html">política de privacidad</a> para el detalle de cómo se manejan los datos.</p>
+
+  <footer>
+    Curva — herramienta personal de estudio. <a href="privacidad.html">Política de privacidad</a>
+  </footer>
+</div>
+</body>
+</html>

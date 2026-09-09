@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad — Curva</title>
+<meta name="description" content="Política de privacidad de Curva: qué datos usa la aplicación y cómo se manejan.">
+<style>
+  :root{--ground:#E7EBF7;--paper:#FBFCFF;--ink:#141A31;--muted:#6A7295;--line:#CFD6EC;--decay:#C8377A}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 22px 80px}
+  h1{font-size:clamp(26px,5vw,38px);line-height:1.1;letter-spacing:-.02em;margin:0 0 6px;font-weight:800}
+  h2{font-size:19px;font-weight:700;margin:32px 0 8px}
+  p{margin:0 0 14px}
+  .fecha{font-family:Consolas,monospace;font-size:12px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:28px}
+  ul{padding-left:20px;margin:0 0 14px}
+  li{margin-bottom:8px}
+  code{background:#EEF1FA;padding:2px 6px;border-radius:2px;font-family:Consolas,monospace;font-size:14px}
+  a{color:var(--decay)}
+  .destacado{background:var(--paper);border:1px solid var(--line);border-left:3px solid var(--decay);
+    border-radius:3px;padding:18px 20px;margin:22px 0}
+  footer{margin-top:44px;border-top:1px solid var(--line);padding-top:18px;font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Política de privacidad</h1>
+  <p class="fecha">Curva &middot; última actualización: septiembre de 2026</p>
+
+  <div class="destacado">
+    <p style="margin:0"><strong>Resumen.</strong> Curva es una aplicación que se ejecuta localmente en la computadora del usuario. No opera servidores, no recopila datos, no crea cuentas y no comparte información con terceros. La única conexión externa posible es con la API de Google Calendar, y solo si el usuario la activa.</p>
+  </div>
+
+  <h2>1. Quién opera esta aplicación</h2>
+  <p>Curva es una herramienta personal de estudio distribuida como código que el usuario ejecuta en su propio equipo. No existe una entidad que reciba o procese datos de los usuarios de forma centralizada.</p>
+
+  <h2>2. Qué datos se almacenan</h2>
+  <p>La aplicación guarda, exclusivamente en el disco duro del usuario, en un archivo llamado <code>repasos.json</code> ubicado en la misma carpeta que el programa:</p>
+  <ul>
+    <li>Los nombres de los temas que el usuario escribe.</li>
+    <li>Las fechas de repaso y los parámetros de cálculo que el usuario configura.</li>
+    <li>Qué repasos ha marcado como completados.</li>
+  </ul>
+  <p>Estos datos nunca salen del equipo del usuario, salvo por la sincronización con Google Calendar descrita abajo.</p>
+
+  <h2>3. Acceso a datos de Google</h2>
+  <p>Si el usuario activa la sincronización, la aplicación solicita autorización mediante OAuth 2.0 con el permiso <code>https://www.googleapis.com/auth/calendar</code>.</p>
+  <p>Ese permiso se emplea únicamente para:</p>
+  <ul>
+    <li>Crear un calendario propio llamado «Repasos (Curva)» en la cuenta del usuario.</li>
+    <li>Crear, actualizar y eliminar dentro de ese calendario los eventos correspondientes a los repasos del usuario.</li>
+  </ul>
+  <p>La aplicación no lee, copia ni analiza los demás calendarios ni eventos de la cuenta. La única lectura que realiza es la lista de calendarios, y con el solo fin de localizar o crear el calendario «Repasos (Curva)».</p>
+
+  <h2>4. Credenciales de acceso</h2>
+  <p>El token de autorización de Google se guarda en un archivo local llamado <code>token.json</code>, en el equipo del usuario. No se transmite a ningún servidor de la aplicación, porque no existe tal servidor. El usuario puede eliminarlo en cualquier momento con el botón «Desconectar» de la aplicación, o revocar el acceso desde la configuración de seguridad de su cuenta de Google.</p>
+
+  <h2>5. Uso limitado</h2>
+  <p>El uso que Curva hace de la información recibida de las APIs de Google se ajusta a la <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de Datos de Usuario de los Servicios de API de Google</a>, incluidos sus requisitos de uso limitado. Los datos obtenidos no se emplean para publicidad, no se venden, no se transfieren a terceros y no se utilizan para entrenar modelos.</p>
+
+  <h2>6. Terceros</h2>
+  <p>La aplicación no incorpora analítica, publicidad, rastreadores ni servicios de terceros de ningún tipo. Este sitio web es estático y no utiliza cookies.</p>
+
+  <h2>7. Menores</h2>
+  <p>La aplicación no solicita ni recopila datos personales, por lo que no recoge información de menores de edad.</p>
+
+  <h2>8. Cambios</h2>
+  <p>Si esta política cambia, la versión actualizada se publicará en esta misma página con su fecha correspondiente.</p>
+
+  <h2>9. Contacto</h2>
+  <p>Para cualquier consulta sobre esta política, escribe al correo de contacto indicado en la pantalla de autorización de la aplicación.</p>
+
+  <footer><a href="index.html">Volver al inicio</a></footer>
+</div>
+</body>
+</html>
