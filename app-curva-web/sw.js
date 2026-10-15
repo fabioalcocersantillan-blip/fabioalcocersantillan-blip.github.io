@@ -2,7 +2,7 @@
    Guarda solo el armazón de la app para que abra sin conexión.
    Las llamadas a Google nunca se cachean: los datos viven en el calendario. */
 
-const CACHE = "curva-v5";
+const CACHE = "curva-v6";
 const ARMAZON = [
   "./",
   "./index.html",

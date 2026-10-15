@@ -103,6 +103,9 @@
     flex-shrink:0}
   .rep.hecho .fecha{color:var(--muted);font-weight:400;text-decoration:line-through}
   .rep.vencido .fecha{color:var(--decay)}
+  .rep.falta{opacity:.62}
+  .rep.falta .fecha{color:var(--amber);text-decoration:none}
+  .rep.falta .meta{color:var(--amber);font-style:italic}
   .rep.proximo{background:rgba(14,128,121,.07);margin:0 -6px;padding-left:8px;padding-right:8px}
 
   .oculto{display:none !important}
@@ -242,6 +245,7 @@
       </div>
       <div id="acciones-detalle" class="botones oculto">
         <button class="ghost" id="btn-cerrar">Volver</button>
+        <button class="oculto" id="btn-completar">Completar los que faltan</button>
         <button class="link" id="btn-borrar">Borrar este tema</button>
       </div>
       <div id="progreso" class="oculto">
@@ -465,26 +469,54 @@ async function tokenValido(){
 }
 
 /* ---------- llamadas a la API ---------- */
-async function api(ruta, opciones = {}, reintento = true){
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+
+/* Google limita cuantas escrituras acepta por minuto. Cuando se pasa el
+   limite responde 403 con motivo rateLimitExceeded, o 429. No es un error
+   definitivo: hay que esperar y repetir. */
+function esTemporal(estado, datos){
+  if(estado === 429 || estado === 500 || estado === 502 || estado === 503) return true;
+  if(estado === 403){
+    const motivo = datos?.error?.errors?.[0]?.reason || datos?.error?.status || "";
+    return /rateLimit|userRateLimit|quotaExceeded|backendError|RESOURCE_EXHAUSTED/i.test(motivo);
+  }
+  return false;
+}
+
+async function api(ruta, opciones = {}, reintento = true, intento = 0){
   const t = await tokenValido();
-  const r = await fetch(API + ruta, {
-    ...opciones,
-    headers: {
-      "Authorization": "Bearer " + t,
-      ...(opciones.body ? {"Content-Type":"application/json"} : {}),
-      ...(opciones.headers||{})
-    }
-  });
+  let r;
+  try{
+    r = await fetch(API + ruta, {
+      ...opciones,
+      headers: {
+        "Authorization": "Bearer " + t,
+        ...(opciones.body ? {"Content-Type":"application/json"} : {}),
+        ...(opciones.headers||{})
+      }
+    });
+  }catch(err){
+    // caida de red: tambien merece reintento
+    if(intento < 4){ await pausa(600 * Math.pow(2, intento)); return api(ruta, opciones, reintento, intento+1); }
+    throw new Error("Sin conexión con Google. Revisa tu internet.");
+  }
   if(r.status === 401 && reintento){
     token = null; tokenVence = 0;
     try{ localStorage.removeItem(K_TOK); }catch(e){}
-    return api(ruta, opciones, false);
+    return api(ruta, opciones, false, intento);
   }
   if(r.status === 204) return null;
   const datos = await r.json().catch(()=>({}));
   if(!r.ok){
+    if(esTemporal(r.status, datos) && intento < 5){
+      // espera creciente con algo de azar, para no reintentar todos a la vez
+      const espera = 800 * Math.pow(2, intento) + Math.random()*400;
+      await pausa(espera);
+      return api(ruta, opciones, reintento, intento + 1);
+    }
     const msg = datos.error?.message || ("HTTP " + r.status);
     const e = new Error(msg); e.status = r.status; e.datos = datos;
+    e.temporal = esTemporal(r.status, datos);
     throw e;
   }
   return datos;
@@ -567,7 +599,7 @@ async function leerTemas(calId){
         id: p.ct, tema: p.cnom || "Sin título", inicio: p.cini,
         ritmo: Number(p.crit)||2, tope: Number(p.ctop)||1095,
         edad: Number(p.cedad)||18, hasta: Number(p.chasta)||85,
-        hora: p.chora || "08:00", eventos: []
+        hora: p.chora || "08:00", total: Number(p.ctot)||0, eventos: []
       });
     }
     porTema.get(p.ct).eventos.push({
@@ -582,20 +614,34 @@ async function leerTemas(calId){
 }
 
 /* ---------- crear un tema (en tandas, para no tardar) ---------- */
-async function crearTema(calId, t, plan, alAvanzar){
-  const total = plan.length;
+async function crearTema(calId, t, repasos, total, alAvanzar){
+  const ruta = "/calendars/" + encodeURIComponent(calId) + "/events";
+  const crear = rep => api(ruta, {method:"POST", body: JSON.stringify(eventoDe(t, rep, total, false))});
+
   let hechos = 0;
-  const lote = 5;
-  for(let i=0;i<plan.length;i+=lote){
-    const tanda = plan.slice(i, i+lote).map(rep =>
-      api("/calendars/" + encodeURIComponent(calId) + "/events", {
-        method:"POST", body: JSON.stringify(eventoDe(t, rep, total, false))
-      })
-    );
-    await Promise.all(tanda);
-    hechos += tanda.length;
+  let fallidos = [];
+  const lote = 3;
+
+  // primera pasada: en tandas pequenas, sin abortar por un fallo suelto
+  for(let i=0;i<repasos.length;i+=lote){
+    const tanda = repasos.slice(i, i+lote);
+    const res = await Promise.allSettled(tanda.map(crear));
+    res.forEach((r, j) => r.status === "fulfilled" ? hechos++ : fallidos.push(tanda[j]));
     alAvanzar && alAvanzar(hechos, total);
+    if(i + lote < repasos.length) await pausa(250);
   }
+
+  // segunda pasada: lo que fallo, de uno en uno y mas despacio
+  if(fallidos.length){
+    const quedan = [];
+    for(const rep of fallidos){
+      try{ await crear(rep); hechos++; alAvanzar && alAvanzar(hechos, total); }
+      catch(e){ quedan.push(rep); }
+      await pausa(700);
+    }
+    fallidos = quedan;
+  }
+  return { creados: hechos, faltan: fallidos.length };
 }
 
 async function marcarEvento(calId, idEvento, hecho, resumen, tema, i, total){
@@ -631,6 +677,7 @@ async function borrarEventos(calId, ids, alAvanzar){
    Interfaz
    ========================================================================== */
 let calId = null, temas = [], plan = null, abierto = null, ocupado = false;
+let faltantes = new Set();   // indices de repasos que no llegaron al calendario
 
 function toast(m){
   const t = $("toast"); t.textContent = m; t.classList.add("on");
@@ -751,11 +798,13 @@ function pintarLista(){
   temas.sort((a,b) => (b._venc>0)-(a._venc>0) || (a._prox?.getTime()||Infinity)-(b._prox?.getTime()||Infinity));
   $("lista").innerHTML = temas.map(t => {
     let sub, cls = "";
-    if(t._venc > 0){ sub = t._venc===1 ? "1 repaso pendiente" : t._venc+" repasos pendientes"; cls="vence"; }
+    const incompleto = t.total && t.eventos.length < t.total;
+    if(incompleto){ sub = "faltan " + (t.total - t.eventos.length) + " repasos por crear"; cls="vence"; }
+    else if(t._venc > 0){ sub = t._venc===1 ? "1 repaso pendiente" : t._venc+" repasos pendientes"; cls="vence"; }
     else if(t._prox){ const d = dif(h, t._prox); sub = (d===1?"mañana":"en "+d+" días") + " · " + fmtS(t._prox); }
     else sub = "completado";
     return '<div class="tema" data-id="'+esc(t.id)+'"><div><div class="nom">'+esc(t.tema)+
-      '</div><div class="sub '+cls+'">'+sub+' · '+t.eventos.length+' repasos</div></div>'+
+      '</div><div class="sub '+cls+'">'+sub+' · '+(t.total||t.eventos.length)+' repasos</div></div>'+
       '<span class="chev">›</span></div>';
   }).join("");
 }
@@ -788,7 +837,7 @@ $("btn-previa").addEventListener("click", () => {
   $("vista").scrollIntoView({behavior:"smooth", block:"start"});
 });
 $("btn-cancelar").addEventListener("click", () => {
-  $("vista").classList.add("oculto"); plan = null; abierto = null;
+  $("vista").classList.add("oculto"); plan = null; abierto = null; faltantes = new Set();
 });
 $("btn-cerrar").addEventListener("click", () => {
   $("vista").classList.add("oculto"); plan = null; abierto = null;
@@ -845,12 +894,14 @@ function pintarRepasos(hechos, prox){
     const hecho = hechos.has(i);
     const vencido = !hecho && r.fecha < h;
     const cls = (hecho?"hecho ":"") + (vencido?"vencido ":"") + (prox && prox.n===r.n ? "proximo":"");
-    const caja = abierto
+    const falta = abierto && faltantes.has(i);
+    const caja = (abierto && !falta)
       ? '<input type="checkbox" data-i="'+i+'"'+(hecho?" checked":"")+' aria-label="Repaso '+r.n+' hecho">'
       : '<span style="width:22px;flex-shrink:0"></span>';
-    html += '<div class="rep '+cls+'">'+caja+
+    html += '<div class="rep '+cls+(falta?" falta":"")+'">'+caja+
       '<div class="f"><div class="fecha">'+fmt(r.fecha)+'</div>'+
-      '<div class="meta">'+DIAS[r.fecha.getDay()]+' · '+Math.round(r.edad)+' años</div></div>'+
+      '<div class="meta">'+(falta ? "no está en el calendario"
+        : DIAS[r.fecha.getDay()]+' · '+Math.round(r.edad)+' años')+'</div></div>'+
       '<div class="gap">'+nombreInt(r.intervalo)+'</div></div>';
   });
   $("repasos").innerHTML = html;
@@ -873,11 +924,15 @@ async function guardar(elPlan, desdeVista){
   $(caja).classList.remove("oculto");
 
   try{
-    await crearTema(calId, t, elPlan, (n,total) => {
+    const r = await crearTema(calId, t, elPlan, elPlan.length, (n,total) => {
       $(texto).textContent = "Creando repasos… " + n + " de " + total;
       $(barra).style.width = (100*n/total) + "%";
     });
-    toast("Listo: " + elPlan.length + " repasos en tu calendario");
+    if(r.faltan){
+      toast("Se crearon " + r.creados + " de " + elPlan.length + ". Abre el tema y pulsa Completar.");
+    }else{
+      toast("Listo: " + r.creados + " repasos en tu calendario");
+    }
     $("tema").value = "";
     $("vista").classList.add("oculto");
     plan = null;
@@ -909,8 +964,16 @@ function abrirTema(id){
   abierto = t;
   plan = calcular({ inicio: pISO(t.inicio), ritmo:t.ritmo, tope:t.tope, edad:t.edad, hasta:t.hasta });
   plan._opciones = t;
-  // el calendario manda: si hay más o menos eventos, se ajusta la vista
-  if(t.eventos.length !== plan.length) plan = plan.slice(0, t.eventos.length);
+  // el calendario manda sobre cuantos repasos tiene este tema
+  const cuantos = t.total || t.eventos.length;
+  if(plan.length !== cuantos) plan = plan.slice(0, cuantos);
+  // los indices que deberian existir pero no estan en el calendario
+  const presentes = new Set(t.eventos.map(e => e.n));
+  faltantes = new Set();
+  for(let i=0;i<plan.length;i++) if(!presentes.has(i)) faltantes.add(i);
+  $("btn-completar").classList.toggle("oculto", faltantes.size === 0);
+  if(faltantes.size) $("btn-completar").textContent =
+    "Completar los " + faltantes.size + " que faltan";
   const hechos = new Set(t.eventos.filter(e => e.hecho).map(e => e.n));
   $("acciones-previa").classList.add("oculto");
   $("acciones-detalle").classList.remove("oculto");
@@ -941,6 +1004,32 @@ $("repasos").addEventListener("change", async e => {
     fallo(err);
   }
   e.target.disabled = false;
+});
+
+/* ---------- completar un tema al que le faltan repasos ---------- */
+$("btn-completar").addEventListener("click", async () => {
+  if(!abierto || ocupado || !faltantes.size) return;
+  ocupado = true;
+  const t = abierto;
+  const total = t.total || plan.length;
+  const pendientes = plan.filter(r => faltantes.has(r.n - 1));
+  $("acciones-detalle").classList.add("oculto");
+  $("progreso").classList.remove("oculto");
+  try{
+    const r = await crearTema(calId, t, pendientes, total, (n, tot) => {
+      $("progreso-texto").textContent = "Creando los que faltan… " + n + " de " + pendientes.length;
+      $("progreso-barra").style.width = (100*n/pendientes.length) + "%";
+    });
+    toast(r.faltan ? "Faltan " + r.faltan + ". Espera un minuto y vuelve a intentarlo."
+                   : "Tema completo: " + total + " repasos");
+    await refrescar();
+    const actualizado = temas.find(x => x.id === t.id);
+    if(actualizado) abrirTema(actualizado.id); else $("vista").classList.add("oculto");
+  }catch(e){ fallo(e); }
+  $("acciones-detalle").classList.remove("oculto");
+  $("progreso").classList.add("oculto");
+  $("progreso-barra").style.width = "0";
+  ocupado = false;
 });
 
 /* ---------- borrar ---------- */
