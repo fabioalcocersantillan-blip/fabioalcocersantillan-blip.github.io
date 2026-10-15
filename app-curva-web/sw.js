@@ -2,7 +2,7 @@
    Guarda solo el armazón de la app para que abra sin conexión.
    Las llamadas a Google nunca se cachean: los datos viven en el calendario. */
 
-const CACHE = "curva-v6";
+const CACHE = "curva-v7";
 const ARMAZON = [
   "./",
   "./index.html",
@@ -39,9 +39,18 @@ self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
 
-  // la red manda; el caché es el respaldo cuando no hay conexión
+  // La red manda; el caché es el respaldo cuando no hay conexión.
+  // Para la página en sí se pide con cache:"reload", que salta el caché
+  // HTTP del navegador: sin esto, GitHub Pages hace que una versión nueva
+  // tarde hasta 10 minutos en llegar a quien ya tenía la app abierta.
+  const navegacion = e.request.mode === "navigate" ||
+    (e.request.destination === "" && e.request.headers.get("accept")?.includes("text/html"));
+  const peticion = navegacion
+    ? new Request(e.request, { cache: "reload" })
+    : e.request;
+
   e.respondWith(
-    fetch(e.request)
+    fetch(peticion)
       .then(r => {
         if (r && r.ok) {
           const copia = r.clone();
